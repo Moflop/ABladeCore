@@ -1,0 +1,177 @@
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+    id 'idea'
+    id 'net.neoforged.moddev' version '2.0.144'
+}
+
+version = mod_version
+group = mod_group_id
+
+repositories {
+    mavenLocal()
+    maven {
+        name = "Modrinth"
+        url = "https://api.modrinth.com/maven"
+    }
+    maven {
+        name = "CurseForge"
+        url = "https://cursemaven.com"
+    }
+    mavenCentral()
+    maven {
+        name = "RedlanceMinecraft"
+        url = "https://repo.redlance.org/public"
+    }
+    maven {
+        name = "MMMaven"
+        url = "https://raw.github.com/0999312/MMMaven/main/repository"
+    }
+}
+
+base {
+    archivesName = mod_id
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+neoForge {
+    // 指定使用的NeoForged版本
+    version = project.neo_version
+
+    parchment {
+        mappingsVersion = project.parchment_mappings_version
+        minecraftVersion = project.parchment_minecraft_version
+    }
+
+
+    runs {
+        client {
+            client()
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+            jvmArgument "-XX:+AllowEnhancedClassRedefinition"
+            programArguments.addAll '--username', 'Mewkooo'
+            programArguments.addAll '--uuid', 'a369b7eb-15e5-4696-a085-82556f5f5452'
+        }
+
+        server {
+            server()
+            programArgument '--nogui'
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+            jvmArgument "-XX:+AllowEnhancedClassRedefinition"
+        }
+
+        gameTestServer {
+            type = "gameTestServer"
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+            jvmArgument "-XX:+AllowEnhancedClassRedefinition"
+        }
+
+        data {
+            data()
+            programArguments.addAll '--mod', project.mod_id, '--all', '--output', file('src/generated/resources/').getAbsolutePath(), '--existing', file('src/main/resources/').getAbsolutePath()
+        }
+
+        configureEach {
+            // 推荐用于用户开发环境的日志数据
+            // 标记可以根据需要添加或移除，使用逗号分隔。
+            // "SCAN"：用于模组扫描。
+            // "REGISTRIES"：用于注册事件的触发。
+            // "REGISTRYDUMP"：用于获取所有注册表的内容。
+            systemProperty 'forge.logging.markers', 'REGISTRIES'
+            logLevel = org.slf4j.event.Level.DEBUG
+        }
+    }
+
+    mods {
+        "${mod_id}" {
+            sourceSet(sourceSets.main)
+        }
+    }
+}
+
+sourceSets.main.resources { srcDir 'src/generated/resources' }
+
+dependencies {
+    // 带有 JEI 的模组依赖示例
+    // JEI API 声明用于编译时使用，而完整的 JEI 构件（artifact）则在运行时使用
+    // compileOnly "mezz.jei:jei-${mc_version}-common-api:${jei_version}"
+    // compileOnly "mezz.jei:jei-${mc_version}-forge-api:${jei_version}"
+    // runtimeOnly "mezz.jei:jei-${mc_version}-forge:${jei_version}"
+
+    // 使用来自 ./libs 目录的模组 jar 包并结合扁平目录仓库（flat dir repository）的模组依赖示例
+    // 这将映射到 ./libs/coolmod-${mc_version}-${coolmod_version}.jar
+    // 在搜索时会忽略 group id —— 在本例中，它是 "blank"
+    // implementation "blank:coolmod-${mc_version}:${coolmod_version}"
+
+    // 使用文件作为依赖项的模组依赖示例
+    // implementation files("libs/coolmod-${mc_version}-${coolmod_version}.jar")
+
+    // 使用同级项目或子项目的项目依赖示例：
+    // implementation project(":myproject")
+
+    // 更多信息请参阅：
+    // http://www.gradle.org/docs/current/userguide/artifact_dependencies_tutorial.html
+    // http://www.gradle.org/docs/current/userguide/dependency_management.html
+
+    //拔刀剑
+    implementation "mods.flammpfeil.slashblade:SlashBlade_Resharped:${slash_blade_version}"
+
+    // MixinExtras
+    implementation(jarJar("io.github.llamalad7:mixinextras-neoforge:0.5.4"))
+
+    // lombok
+    compileOnly "org.projectlombok:lombok:1.18.38"
+    annotationProcessor "org.projectlombok:lombok:1.18.38"
+}
+
+var generateModMetadata = tasks.register("generateModMetadata", ProcessResources) {
+    var replaceProperties = [minecraft_version      : minecraft_version,
+                             minecraft_version_range: minecraft_version_range,
+                             neo_version            : neo_version,
+                             neo_version_range      : neo_version_range,
+                             loader_version_range   : loader_version_range,
+                             mod_id                 : mod_id,
+                             mod_name               : mod_name,
+                             mod_license            : mod_license,
+                             mod_version            : mod_version,
+                             mod_authors            : mod_authors,
+                             slash_blade_version    : slash_blade_version,]
+    inputs.properties replaceProperties
+    expand replaceProperties
+    from "src/main/templates"
+    into "build/generated/sources/modMetadata"
+}
+
+sourceSets.main.resources.srcDir generateModMetadata
+neoForge.ideSyncTask generateModMetadata
+
+publishing {
+    publications {
+        register('mavenJava', MavenPublication) {
+            from components.java
+        }
+    }
+    repositories {
+        maven {
+            url "file://${project.projectDir}/repo"
+        }
+    }
+}
+
+idea {
+    module {
+        downloadSources = true
+        downloadJavadoc = true
+    }
+}
+
+// 必须，编码需要显式指定为 UTF
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+java {
+    // 编译源码文件，方便发布 maven
+    withSourcesJar()
+}
