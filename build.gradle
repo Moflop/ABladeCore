@@ -115,7 +115,8 @@ dependencies {
     // http://www.gradle.org/docs/current/userguide/dependency_management.html
 
     //拔刀剑
-    implementation "mods.flammpfeil.slashblade:SlashBlade_Resharped:${slash_blade_version}"
+    //implementation "mods.flammpfeil.slashblade:SlashBlade_Resharped:${slash_blade_version}"
+    implementation "maven.modrinth:8T53F0sy:u02EDgAr" // 官方仓库未更新，暂用
 
     // MixinExtras
     implementation(jarJar("io.github.llamalad7:mixinextras-neoforge:0.5.4"))

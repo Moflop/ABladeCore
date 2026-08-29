@@ -17,7 +17,10 @@ displayName = "${mod_name}" #mandatory
 authors = "${mod_authors}" #optional
 
 # 模组的描述文本(支持多行!) (#mandatory)
-description = '''AbbyQAQ‘s SlashBlade Core'''
+description = '''
+AbbyQAQ的拔刀剑核心。
+AbbyQAQ‘s SlashBlade Core.
+'''
 
 [[mixins]]
 config = "${mod_id}.mixins.json"

@@ -1,6 +1,8 @@
-package mod.abbyqaq;
+package mod.abbyqaq.abcore;
 
 import com.mojang.logging.LogUtils;
+import mod.abbyqaq.abcore.init.ModEntities;
+import mod.abbyqaq.abcore.init.ModProjectileTypes;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
@@ -13,7 +15,9 @@ public class ABladeCoreMod {
 	private static final Logger LOGGER = LogUtils.getLogger();
 
 	public ABladeCoreMod(IEventBus modEventBus, ModContainer modContainer) {
-		LOGGER.info("Mod initialized!");
+		ModProjectileTypes.register(modEventBus);
+		ModEntities.register(modEventBus);
+		LOGGER.info("AbbyQAQ's SlashBlade Core initialized!");
 	}
 
 	public static ResourceLocation prefix(String path) {

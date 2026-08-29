@@ -1,7 +1,7 @@
 {
   "required": true,
   "minVersion": "0.8",
-  "package": "mod.abbyqaq.mixin",
+  "package": "mod.abbyqaq.abcore.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
   ],
