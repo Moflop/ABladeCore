@@ -21,7 +21,7 @@ public class GenericProjectileRenderer extends EntityRenderer<GenericProjectile>
 
 	@Override
 	public void render(GenericProjectile entity, float entityYaw, float partialTicks, PoseStack poseStack, MultiBufferSource buffer, int packedLight) {
-		ResourceLocation typeLoc = entity.getProjectileLocation();
+		ResourceLocation typeLoc = entity.getRenderType();
 
 		ProjectileRenderRegistry.RenderBehavior behavior = ProjectileRenderRegistry.get(typeLoc);
 
@@ -34,7 +34,7 @@ public class GenericProjectileRenderer extends EntityRenderer<GenericProjectile>
 
 	@Override
 	public ResourceLocation getTextureLocation(GenericProjectile entity) {
-		ResourceLocation typeLoc = entity.getProjectileLocation();
+		ResourceLocation typeLoc = entity.getRenderType();
 
 		ProjectileRenderRegistry.RenderBehavior behavior = ProjectileRenderRegistry.get(typeLoc);
 
