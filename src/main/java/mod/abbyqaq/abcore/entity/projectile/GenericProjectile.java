@@ -4,6 +4,7 @@ import lombok.Getter;
 import lombok.Setter;
 import mod.abbyqaq.abcore.ABladeCoreMod;
 import mod.abbyqaq.abcore.init.ModEntities;
+import mod.abbyqaq.abcore.init.ModProjectileRenderTypes;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
@@ -141,9 +142,40 @@ public class GenericProjectile extends ThrowableProjectile {
 	}
 
 	@Override
+	public void tick() {
+		super.tick();
+		if (!this.level().isClientSide) {
+
+		}
+	}
+
+	@Override
+	protected void onHitEntity(EntityHitResult result) {
+		super.onHitEntity(result);
+		if (!this.level().isClientSide) {
+			result.getEntity().hurt(this.damageSources().thrown(this, this.getOwner()),
+					getDamage());
+			this.discard();
+		}
+	}
+
+	@Override
+	protected void onHitBlock(BlockHitResult result) {
+		super.onHitBlock(result);
+		if (!this.level().isClientSide) {
+			this.discard();
+		}
+	}
+
+	@Override
+	protected double getDefaultGravity() {
+		return this.gravity;
+	}
+
+	@Override
 	protected void defineSynchedData(SynchedEntityData.Builder builder) {
 		builder.define(DELAY_SHOOT_TICKS, 0);
-		builder.define(RENDER_TYPE, ABladeCoreMod.prefix("default").toString());
+		builder.define(RENDER_TYPE, ModProjectileRenderTypes.DEFAULT);
 		builder.define(RENDER_SCALE, 1.0F);
 		builder.define(TRAIL, false);
 		builder.define(GLOWING, false);
@@ -158,13 +190,13 @@ public class GenericProjectile extends ThrowableProjectile {
 		this.entityData.set(DELAY_SHOOT_TICKS, delayShootTicks);
 	}
 
-	public GenericProjectile setRenderType(ResourceLocation location) {
-		this.entityData.set(RENDER_TYPE, location.toString());
+	public GenericProjectile setRenderType(String location) {
+		this.entityData.set(RENDER_TYPE, location);
 		return this;
 	}
 
-	public ResourceLocation getRenderType() {
-		return ResourceLocation.parse(this.entityData.get(RENDER_TYPE));
+	public String getRenderType() {
+		return this.entityData.get(RENDER_TYPE);
 	}
 
 	public GenericProjectile setRenderScale(float renderScale) {
@@ -198,37 +230,6 @@ public class GenericProjectile extends ThrowableProjectile {
 
 	public void setMaxAge(int maxAge) {
 		this.entityData.set(MAX_AGE, maxAge);
-	}
-
-	@Override
-	protected double getDefaultGravity() {
-		return this.gravity;
-	}
-
-	@Override
-	public void tick() {
-		super.tick();
-		if (!this.level().isClientSide) {
-
-		}
-	}
-
-	@Override
-	protected void onHitEntity(EntityHitResult result) {
-		super.onHitEntity(result);
-		if (!this.level().isClientSide) {
-			result.getEntity().hurt(this.damageSources().thrown(this, this.getOwner()),
-					getDamage());
-			this.discard();
-		}
-	}
-
-	@Override
-	protected void onHitBlock(BlockHitResult result) {
-		super.onHitBlock(result);
-		if (!this.level().isClientSide) {
-			this.discard();
-		}
 	}
 
 	private static <E extends Enum<E>> void writeEnum(CompoundTag tag, String key, E value) {

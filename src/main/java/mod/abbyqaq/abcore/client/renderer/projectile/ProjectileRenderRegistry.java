@@ -1,10 +1,5 @@
 package mod.abbyqaq.abcore.client.renderer.projectile;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import mod.abbyqaq.abcore.entity.projectile.GenericProjectile;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.resources.ResourceLocation;
-
 import java.util.HashMap;
 import java.util.Map;
 
@@ -16,24 +11,13 @@ import java.util.Map;
  */
 public class ProjectileRenderRegistry {
 
-	// 渲染行为接口
-	public interface RenderBehavior {
-		void render(GenericProjectile entity, float entityYaw, float partialTicks,
-				PoseStack poseStack, MultiBufferSource buffer, int packedLight);
+	private static final Map<String, ProjectileRenderBehavior> RENDERERS = new HashMap<>();
 
-		// 可选：提供该投掷物的纹理
-		default ResourceLocation getTexture(GenericProjectile entity) {
-			return ResourceLocation.fromNamespaceAndPath("minecraft", "textures/misc/white.png");
-		}
+	public static void register(String type, ProjectileRenderBehavior behavior) {
+		RENDERERS.put(type, behavior);
 	}
 
-	private static final Map<ResourceLocation, RenderBehavior> RENDERERS = new HashMap<>();
-
-	public static void register(ResourceLocation typeId, RenderBehavior behavior) {
-		RENDERERS.put(typeId, behavior);
-	}
-
-	public static RenderBehavior get(ResourceLocation typeId) {
-		return RENDERERS.get(typeId);
+	public static ProjectileRenderBehavior get(String type) {
+		return RENDERERS.get(type);
 	}
 }

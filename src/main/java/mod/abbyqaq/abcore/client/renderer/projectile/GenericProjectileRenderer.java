@@ -21,9 +21,9 @@ public class GenericProjectileRenderer extends EntityRenderer<GenericProjectile>
 
 	@Override
 	public void render(GenericProjectile entity, float entityYaw, float partialTicks, PoseStack poseStack, MultiBufferSource buffer, int packedLight) {
-		ResourceLocation typeLoc = entity.getRenderType();
+		String type = entity.getRenderType();
 
-		ProjectileRenderRegistry.RenderBehavior behavior = ProjectileRenderRegistry.get(typeLoc);
+		ProjectileRenderBehavior behavior = ProjectileRenderRegistry.get(type);
 
 		if (behavior != null) {
 			behavior.render(entity, entityYaw, partialTicks, poseStack, buffer, packedLight);
@@ -34,9 +34,9 @@ public class GenericProjectileRenderer extends EntityRenderer<GenericProjectile>
 
 	@Override
 	public ResourceLocation getTextureLocation(GenericProjectile entity) {
-		ResourceLocation typeLoc = entity.getRenderType();
+		String type = entity.getRenderType();
 
-		ProjectileRenderRegistry.RenderBehavior behavior = ProjectileRenderRegistry.get(typeLoc);
+		ProjectileRenderBehavior behavior = ProjectileRenderRegistry.get(type);
 
 		return behavior != null ? behavior.getTexture(entity) : ResourceLocation.fromNamespaceAndPath("minecraft", "textures/misc/missingno.png");
 	}

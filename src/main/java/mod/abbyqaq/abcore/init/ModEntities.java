@@ -2,15 +2,12 @@ package mod.abbyqaq.abcore.init;
 
 import mod.abbyqaq.abcore.ABladeCoreMod;
 import mod.abbyqaq.abcore.entity.projectile.GenericProjectile;
-import mod.abbyqaq.abcore.entity.projectile.ProjectileType;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
-
-import java.util.function.Supplier;
 
 /**
  * TODO：描述
