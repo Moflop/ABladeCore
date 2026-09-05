@@ -20,6 +20,7 @@ import org.objectweb.asm.Type;
  */
 @EventBusSubscriber()
 public class ClientSetupHandler {
+
 	@SubscribeEvent
 	public static void onClientSetup(final FMLClientSetupEvent event) {
 		event.enqueueWork(() -> {
@@ -37,13 +38,13 @@ public class ClientSetupHandler {
 							if (ProjectileRenderBehavior.class.isAssignableFrom(clazz)) {
 
 								// 获取注解里的 id 参数
-								String id = (String) data.annotationData().get("id");
+								String type = (String) data.annotationData().get("type");
 
 								// 实例化对象并注册
 								ProjectileRenderBehavior instance = (ProjectileRenderBehavior) clazz.getDeclaredConstructor().newInstance();
-								ProjectileRenderRegistry.register(id, instance);
+								ProjectileRenderRegistry.register(type, instance);
 								if (!FMLEnvironment.production) {
-									System.out.println("Auto-registered renderer: " + id + " -> " + className);
+									System.out.println("Auto-registered renderer: " + type + " -> " + className);
 								}
 							}else {
 								throw new IllegalStateException(

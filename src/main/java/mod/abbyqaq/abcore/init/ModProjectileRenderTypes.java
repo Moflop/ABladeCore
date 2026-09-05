@@ -9,4 +9,5 @@ package mod.abbyqaq.abcore.init;
 public class ModProjectileRenderTypes {
 
 	public static final String DEFAULT = "default";
+	public static final String DRIVE_TEST = "drive_test";
 }
