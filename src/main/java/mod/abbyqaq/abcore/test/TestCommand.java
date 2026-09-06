@@ -3,11 +3,15 @@ package mod.abbyqaq.abcore.test;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.context.CommandContext;
 import mod.abbyqaq.abcore.entity.projectile.GenericProjectile;
+import mod.abbyqaq.abcore.utils.EntityFindHelper;
 import mod.abbyqaq.abcore.utils.EntityFindUtils;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.level.ClipContext;
+import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -44,9 +48,9 @@ public class TestCommand {
 
 		if (source.getEntity() instanceof LivingEntity shooter) {
 			GenericProjectile projectile = new GenericProjectile(level, shooter);
-			projectile.setStartAnchorModeAndOffset(GenericProjectile.AnchorMode.OWNER, new Vec3(0.0F, 0, 1.0));
-			projectile.setDelayShootTicks(30);
-			projectile.setMaxAge(6000);
+			projectile.setStartAnchorModeAndOffset(GenericProjectile.AnchorMode.OWNER, new Vec3(0.0F, 0, 0.0));
+			projectile.setDelayShootTicks(60);
+			projectile.setMaxAge(60000);
 			projectile.setRoll(90);
 			projectile.setAimMode(GenericProjectile.AimMode.OWNER_LOOK);
 			projectile.setHasGravity(true);
@@ -65,8 +69,8 @@ public class TestCommand {
 
 		if (source.getEntity() instanceof LivingEntity shooter) {
 			GenericProjectile projectile = new GenericProjectile(level, shooter);
-			projectile.setLockedTarget(EntityFindUtils.getNearestAnyEntityToCrosshair(shooter, 100.0f, 30.0f, e -> e instanceof LivingEntity));
-			projectile.setStartAnchorModeAndOffset(GenericProjectile.AnchorMode.TARGET, new Vec3(0.0F, 5.0, 0.0));
+			projectile.setLockedTarget(EntityFindHelper.getNearestLivingEntity(shooter));
+			projectile.setStartAnchorModeAndOffset(GenericProjectile.AnchorMode.OWNER, new Vec3(0.0F, 5.0, 0.0));
 			projectile.setDelayShootTicks(30);
 			projectile.setMaxAge(6000);
 			projectile.setAimMode(GenericProjectile.AimMode.TARGET_CENTER);

@@ -2,8 +2,10 @@ package mod.abbyqaq.abcore.utils;
 
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.boss.EnderDragonPart;
+import net.minecraft.world.entity.projectile.ProjectileUtil;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.entity.PartEntity;
 
@@ -135,7 +137,7 @@ public class EntityFindUtils {
 	}
 
 	/**
-	 * 获取准星方向（视线锥体）内，离准星角度最近的任意实体 (高性能 + 支持多部分实体)
+	 * 获取准星方向（视线锥体）内，离准星角度最近的任意实体 (高性能 + 支持多部分实体 + 优先射线直击)
 	 *
 	 * @param source            中心实体 (会自动从结果中排除)
 	 * @param maxDistance       最大搜索距离
@@ -150,8 +152,30 @@ public class EntityFindUtils {
 		// 眼睛坐标与视线向量
 		Vec3 eyePos = source.getEyePosition(1.0F);
 		Vec3 lookVec = source.getViewVector(1.0F);
+		Vec3 endPos = eyePos.add(lookVec.scale(maxDistance));
 
-		// 预计算常量
+		// 优先进行精确的射线/包围盒直击检测 (解决大实体挡在前面却被忽略、以及遮挡问题)
+		EntityHitResult directHit = ProjectileUtil.getEntityHitResult(
+				source,
+				eyePos,
+				endPos,
+				source.getBoundingBox().inflate(maxDistance),
+				e -> {
+					if (e == source || e.isRemoved()) return false;
+					Entity root = getRootEntity(e);
+					return filter == null || filter.test(root);
+				},
+				maxDistance * maxDistance
+		);
+
+		if (directHit != null && directHit.getEntity() != null) {
+			Entity root = getRootEntity(directHit.getEntity());
+			if (root != null) {
+				return root;
+			}
+		}
+
+		// 如果射线没有直接命中，则退化为原有的高性能圆锥范围搜索兜底
 		double maxDistSqr = maxDistance * maxDistance;
 		double minDotProduct = Math.cos(Math.toRadians(maxDeviationAngle));
 
@@ -215,13 +239,13 @@ public class EntityFindUtils {
 			if (dot < minDotProduct) continue;
 
 			// 【判定逻辑】
-			// 1. dot (点乘结果) 越大，说明越贴近准星。
+			// dot (点乘结果) 越大，说明越贴近准星。
 			if (dot > bestScore) {
 				bestScore = dot;
 				nearest = entity;
 				nearestDistSqr = distSqr;
 			}
-			// 2. 领带打破机制 (Tie-breaker): 如果两个实体的准星夹角相差无几(差别小于0.01)，则优先选取物理距离更近的
+			// 领带打破机制 (Tie-breaker): 如果两个实体的准星夹角相差无几(差别小于0.01)，则优先选取物理距离更近的
 			else if (Math.abs(dot - bestScore) < 0.01 && distSqr < nearestDistSqr) {
 				nearest = entity;
 				nearestDistSqr = distSqr;
@@ -233,7 +257,7 @@ public class EntityFindUtils {
 	}
 
 	/**
-	 * 获取准星方向（视线锥体）内，离准星角度最近的指定类型实体
+	 * 获取准星方向（视线锥体）内，离准星角度最近的指定类型实体 (优先射线直击)
 	 *
 	 * @param source         中心实体 (通常是玩家或发射者)
 	 * @param targetClass    要寻找的实体类
@@ -249,6 +273,28 @@ public class EntityFindUtils {
 
 		Vec3 eyePos = source.getEyePosition(1.0F);
 		Vec3 lookVec = source.getViewVector(1.0F);
+		Vec3 endPos = eyePos.add(lookVec.scale(maxDistance));
+
+		EntityHitResult directHit = ProjectileUtil.getEntityHitResult(
+				source,
+				eyePos,
+				endPos,
+				source.getBoundingBox().inflate(maxDistance),
+				e -> {
+					if (e == source || e.isRemoved()) return false;
+					Entity root = getRootEntity(e);
+					if (!targetClass.isInstance(root)) return false;
+					return filter == null || filter.test((T) root);
+				},
+				maxDistance * maxDistance
+		);
+
+		if (directHit != null && directHit.getEntity() != null) {
+			Entity root = getRootEntity(directHit.getEntity());
+			if (targetClass.isInstance(root)) {
+				return (T) root;
+			}
+		}
 
 		double maxDistSqr = maxDistance * maxDistance;
 		double minDotProduct = Math.cos(Math.toRadians(maxDeviationAngle));

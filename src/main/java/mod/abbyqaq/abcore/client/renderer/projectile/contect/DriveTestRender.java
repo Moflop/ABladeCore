@@ -12,6 +12,7 @@ import mods.flammpfeil.slashblade.client.renderer.util.BladeRenderState;
 import mods.flammpfeil.slashblade.client.renderer.util.MSAutoCloser;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
 import org.joml.Quaternionf;
 
@@ -55,9 +56,16 @@ public class DriveTestRender implements ProjectileRenderBehavior {
 //
 //			poseStack.mulPose(renderRot);
 
-			Quaternionf renderRot = new Quaternionf();
-			entity.clientPrevRotation.slerp(entity.clientRotation, partialTicks, renderRot);
-			poseStack.mulPose(renderRot);
+			float yRot = Mth.rotLerp(partialTicks, entity.yRotO, entity.getYRot());
+			float xRot = Mth.rotLerp(partialTicks, entity.xRotO, entity.getXRot());
+			float zRot = entity.getRoll();
+
+			Quaternionf rotation = new Quaternionf()
+					.rotateY((float) Math.toRadians(yRot))
+					.rotateX((float) Math.toRadians(-xRot))
+					.rotateZ((float) Math.toRadians(zRot));
+
+			poseStack.mulPose(rotation);
 
 			float scale = 0.015f;
 			poseStack.scale(scale, scale, scale);
