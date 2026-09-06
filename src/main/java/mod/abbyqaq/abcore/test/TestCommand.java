@@ -44,10 +44,12 @@ public class TestCommand {
 
 		if (source.getEntity() instanceof LivingEntity shooter) {
 			GenericProjectile projectile = new GenericProjectile(level, shooter);
-			//projectile.setStartAnchorModeAndOffset(GenericProjectile.AnchorMode.OWNER, new Vec3(0.0F, 0, 1.0));
-			projectile.setDelayShootTicks(1600);
-			//projectile.setStartRotationFromEulerYXZ(0,0,90);
-			//projectile.setAimMode(GenericProjectile.AimMode.OWNER_LOOK);
+			projectile.setStartAnchorModeAndOffset(GenericProjectile.AnchorMode.OWNER, new Vec3(0.0F, 0, 1.0));
+			projectile.setDelayShootTicks(30);
+			projectile.setMaxAge(6000);
+			projectile.setRoll(90);
+			projectile.setAimMode(GenericProjectile.AimMode.OWNER_LOOK);
+			projectile.setHasGravity(true);
 
 			level.addFreshEntity(projectile);
 
@@ -64,8 +66,9 @@ public class TestCommand {
 		if (source.getEntity() instanceof LivingEntity shooter) {
 			GenericProjectile projectile = new GenericProjectile(level, shooter);
 			projectile.setLockedTarget(EntityFindUtils.getNearestAnyEntityToCrosshair(shooter, 100.0f, 30.0f, e -> e instanceof LivingEntity));
-			projectile.setStartAnchorModeAndOffset(GenericProjectile.AnchorMode.OWNER, new Vec3(0.0F, 1.0, 1.0));
-			projectile.setDelayShootTicks(1600);
+			projectile.setStartAnchorModeAndOffset(GenericProjectile.AnchorMode.TARGET, new Vec3(0.0F, 5.0, 0.0));
+			projectile.setDelayShootTicks(30);
+			projectile.setMaxAge(6000);
 			projectile.setAimMode(GenericProjectile.AimMode.TARGET_CENTER);
 
 			level.addFreshEntity(projectile);

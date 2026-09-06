@@ -3,8 +3,11 @@ package mod.abbyqaq.abcore.entity.projectile;
 import mod.abbyqaq.abcore.init.ModEntities;
 import mod.abbyqaq.abcore.init.ModProjectileRenderTypes;
 import mod.abbyqaq.abcore.utils.EntityFindUtils;
+import mods.flammpfeil.slashblade.entity.EntityBlisteringSwords;
+import mods.flammpfeil.slashblade.entity.EntityHeavyRainSwords;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
@@ -14,6 +17,7 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
+import net.neoforged.neoforge.entity.IEntityWithComplexSpawn;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
@@ -26,12 +30,15 @@ import java.util.UUID;
  * @author Arcomit
  * @since 2026-08-29
  */
-public class GenericProjectile extends Entity {
+public class GenericProjectile extends Entity implements IEntityWithComplexSpawn {
 	// 发射前的锚定模式
 	public enum AnchorMode {OWNER, TARGET}
 
 	// 发射前的瞄准模式
 	public enum AimMode {FIXED, OWNER_LOOK, TARGET_CENTER}
+
+	// 发射后的追踪模式
+	public enum HomingMode {NONE, LOCKED_TARGET}
 
 	// ===========实体数据（自动同步）===========
 	private static final EntityDataAccessor<Integer> OWNER_ID =
@@ -39,11 +46,11 @@ public class GenericProjectile extends Entity {
 	private static final EntityDataAccessor<Integer> LOCKED_TARGET_ID =
 			SynchedEntityData.defineId(GenericProjectile.class, EntityDataSerializers.INT);
 
-	// 1. 锚定模式 (用 String 存储，兼容性更好)
+	// 锚定模式 (用 String 存储，兼容性更好)
 	private static final EntityDataAccessor<String> ANCHOR_MODE =
 			SynchedEntityData.defineId(GenericProjectile.class, EntityDataSerializers.STRING);
 
-	// 3. 锚定偏移量 (客户端计算位置必需) 1.21.1 推荐使用 Vector3f
+	// 锚定偏移量 (客户端计算位置必需) 1.21.1 推荐使用 Vector3f
 	private static final EntityDataAccessor<Vector3f> ANCHOR_OFFSET =
 			SynchedEntityData.defineId(GenericProjectile.class, EntityDataSerializers.VECTOR3);
 
@@ -51,17 +58,22 @@ public class GenericProjectile extends Entity {
 	private static final EntityDataAccessor<String> AIM_MODE =
 			SynchedEntityData.defineId(GenericProjectile.class, EntityDataSerializers.STRING);
 
-	// 旋转
-	private static final EntityDataAccessor<Quaternionf> ROTATION =
-			SynchedEntityData.defineId(GenericProjectile.class, EntityDataSerializers.QUATERNION);
+	// 运动方向 (仅方向，不含速度)
+	private static final EntityDataAccessor<Vector3f> SHOOT_DIRECTION =
+			SynchedEntityData.defineId(GenericProjectile.class, EntityDataSerializers.VECTOR3);
 
-	// 横滚值
+	// 横滚值(仅用于初始，动画应在渲染处实现)
 	private static final EntityDataAccessor<Float> ROLL =
 			SynchedEntityData.defineId(GenericProjectile.class, EntityDataSerializers.FLOAT);
 
 	private static final EntityDataAccessor<Integer> MAX_AGE = SynchedEntityData.defineId(GenericProjectile.class, EntityDataSerializers.INT);
-	private static final EntityDataAccessor<Integer> TICK_COUNT = SynchedEntityData.defineId(GenericProjectile.class, EntityDataSerializers.INT);
 	private static final EntityDataAccessor<Integer> DELAY_SHOOT_TICKS = SynchedEntityData.defineId(GenericProjectile.class, EntityDataSerializers.INT);
+	private static final EntityDataAccessor<Float> VELOCITY = SynchedEntityData.defineId(GenericProjectile.class, EntityDataSerializers.FLOAT);
+	private static final EntityDataAccessor<Boolean> HAS_GRAVITY = SynchedEntityData.defineId(GenericProjectile.class, EntityDataSerializers.BOOLEAN);
+	private static final EntityDataAccessor<Float> GRAVITY = SynchedEntityData.defineId(GenericProjectile.class, EntityDataSerializers.FLOAT);
+	private static final EntityDataAccessor<Float> FRICTION_AIR = SynchedEntityData.defineId(GenericProjectile.class, EntityDataSerializers.FLOAT);
+	private static final EntityDataAccessor<Float> FRICTION_WATER = SynchedEntityData.defineId(GenericProjectile.class, EntityDataSerializers.FLOAT);
+
 	private static final EntityDataAccessor<String> RENDER_TYPE = SynchedEntityData.defineId(GenericProjectile.class, EntityDataSerializers.STRING);
 
 	// ============没有双端同步============
@@ -75,10 +87,7 @@ public class GenericProjectile extends Entity {
 	@Nullable
 	private Entity cachedLockedTarget = null;
 
-	// 上一次的旋转四元数，用于插帧
-	public Quaternionf prevRotation = new Quaternionf();
-
-	// 独立于 EntityData，用于保护客户端渲染不被服务端强行覆盖
+	public Quaternionf clientPrevRotation = new Quaternionf();
 	public Quaternionf clientRotation = new Quaternionf();
 
 	public GenericProjectile(EntityType<? extends Entity> type, Level level) {
@@ -99,25 +108,42 @@ public class GenericProjectile extends Entity {
 		builder.define(ANCHOR_MODE, "");
 		builder.define(ANCHOR_OFFSET, new Vector3f(0, 0, 0));
 		builder.define(AIM_MODE, AimMode.FIXED.name());
-		builder.define(ROTATION, new Quaternionf());
+		builder.define(SHOOT_DIRECTION, new Vector3f(0, 0, 1));
 		builder.define(ROLL, 0.0F);
 
 		builder.define(MAX_AGE, 1200);
-		builder.define(TICK_COUNT, 0);
 		builder.define(DELAY_SHOOT_TICKS, 0);
+		builder.define(VELOCITY, 1.0F);
+		builder.define(HAS_GRAVITY, false);
+		builder.define(GRAVITY, 0.03F);
+		builder.define(FRICTION_AIR, 1.0F);
+		builder.define(FRICTION_WATER, 1.0F);
 		builder.define(RENDER_TYPE, ModProjectileRenderTypes.DRIVE_TEST);
 	}
 
 	@Override
 	public void onSyncedDataUpdated(EntityDataAccessor<?> key) {
 		super.onSyncedDataUpdated(key);
-		if (ROTATION.equals(key)) {
-			// 实体刚创建时将旋转同步到
-			if (this.tickCount <= 1 && this.level().isClientSide) {
-				this.clientRotation.set(this.entityData.get(ROTATION));
-				this.prevRotation.set(this.getRotation());
+		// 确保只在实体刚生成的初始阶段执行
+		if (this.tickCount <= 1 && this.level().isClientSide) {
+			if (SHOOT_DIRECTION.equals(key) || ROLL.equals(key)) {
+				Vector3f initDir = new Vector3f(this.getShootDirection());
+				float initRoll = this.getRoll();
+				Quaternionf initQuat = this.calculateRotationFromDirection(initDir, initRoll);
+				this.clientRotation.set(initQuat);
+				this.clientPrevRotation.set(initQuat);
 			}
 		}
+	}
+
+	@Override
+	public void writeSpawnData(RegistryFriendlyByteBuf buffer) {
+		buffer.writeInt(this.tickCount);
+	}
+
+	@Override
+	public void readSpawnData(RegistryFriendlyByteBuf buffer) {
+		this.tickCount = buffer.readInt();
 	}
 
 	// ============ EntityData 的 Set/Get 方法 ============
@@ -142,25 +168,19 @@ public class GenericProjectile extends Entity {
 
 	public void setAimMode(AimMode mode) {
 		this.entityData.set(AIM_MODE, mode.name());
+		this.handlerDelayShootMovementDirection();
 	}
 	public AimMode getAimMode() {
 		String modeStr = this.entityData.get(AIM_MODE);
 		return modeStr.isEmpty() ? AimMode.FIXED : AimMode.valueOf(modeStr);
 	}
 
-	public void setRotation(Quaternionf quat) {
-		if (this.level().isClientSide) {
-			this.clientRotation.set(quat);
-			return;
-		}
-		this.entityData.set(ROTATION, new Quaternionf(quat));
+	public void setShootDirection(Vector3f direction) {
+		this.entityData.set(SHOOT_DIRECTION, direction);
 	}
-	public Quaternionf getRotation() {
-		// 客户端直接读取本地丝滑数据，不读 EntityData（避免拿到延迟数据）
-		if (this.level().isClientSide) {
-			return this.clientRotation;
-		}
-		return this.entityData.get(ROTATION);
+
+	public Vector3f getShootDirection() {
+		return this.entityData.get(SHOOT_DIRECTION);
 	}
 
 	public void setRoll(float roll) {
@@ -173,11 +193,26 @@ public class GenericProjectile extends Entity {
 	public void setMaxAge(int maxAge) { this.entityData.set(MAX_AGE, maxAge); }
 	public int getMaxAge() { return this.entityData.get(MAX_AGE); }
 
-	public void setTickCount(int tickCount) { this.entityData.set(TICK_COUNT, tickCount); }
-	public int getTickCount() { return this.entityData.get(TICK_COUNT); }
-
 	public void setDelayShootTicks(int delayShootTicks) { this.entityData.set(DELAY_SHOOT_TICKS, delayShootTicks); }
 	public int getDelayShootTicks() { return this.entityData.get(DELAY_SHOOT_TICKS); }
+
+	public void setVelocity(float velocity) { this.entityData.set(VELOCITY, velocity); }
+	public float getVelocity() { return this.entityData.get(VELOCITY); }
+
+	public void setHasGravity(boolean hasGravity) { this.entityData.set(HAS_GRAVITY, hasGravity); }
+	public boolean hasGravity() { return this.entityData.get(HAS_GRAVITY); }
+
+	public void setGravity(float gravity) { this.entityData.set(GRAVITY, gravity); }
+	@Override
+	protected double getDefaultGravity() {
+		return this.entityData.get(GRAVITY);
+	}
+
+	public void setFrictionAir(float frictionAir) { this.entityData.set(FRICTION_AIR, frictionAir); }
+	public float getFrictionAir() { return this.entityData.get(FRICTION_AIR); }
+
+	public void setFrictionWater(float frictionWater) { this.entityData.set(FRICTION_WATER, frictionWater); }
+	public float getFrictionWater() { return this.entityData.get(FRICTION_WATER); }
 
 	public void setRenderType(String location) { this.entityData.set(RENDER_TYPE, location); }
 	public String getRenderType() { return this.entityData.get(RENDER_TYPE); }
@@ -265,9 +300,15 @@ public class GenericProjectile extends Entity {
 		}
 	}
 
-
 	public void setStartShootDirection(float x, float y, float z) {
-
+		Vector3f direction = new Vector3f(x, y, z);
+		// 防止传入全0向量导致归一化时发生除以0的错误
+		if (direction.lengthSquared() > 0.0001F) {
+			direction.normalize(); // 归一化，使其仅表示方向
+		} else {
+			direction.set(0, 0, 1);
+		}
+		this.setShootDirection(direction);
 	}
 
 	// ============ Tick 逻辑 ============
@@ -291,6 +332,8 @@ public class GenericProjectile extends Entity {
 
 			// 设置到偏移位置
 			this.setPos(targetPos.x, targetPos.y, targetPos.z);
+			// 处理延迟发射期间瞄准的方向
+			this.handlerDelayShootMovementDirection();
 			this.tick();
 		}
 	}
@@ -298,31 +341,159 @@ public class GenericProjectile extends Entity {
 	@Override
 	public void tick() {
 		super.tick();
-		this.prevRotation.set(this.getRotation());
 
-		// 【重点修改】双端共同自增 lifetime，保持时间轴完全一致
-		int currentLifetime = this.getTickCount() + 1;
+		int currentLifetime = this.tickCount;
+		if (currentLifetime <= this.getDelayShootTicks()) {
+			if (this.getVehicle() == null) {
+				Entity anchor = this.getAnchorEntity();
+				if (anchor != null && !anchor.isRemoved()) {
+					this.startRiding(anchor, true);
+				}
+			}
+
+			this.setNoGravity(true);
+			this.setDeltaMovement(Vec3.ZERO);
+		}else if (currentLifetime == this.getDelayShootTicks() + 1) {
+			// 脱离骑乘
+			if (this.isPassenger()) {
+				this.stopRiding();
+			}
+
+			Vec3 dir = new Vec3(this.getShootDirection()).scale(this.getVelocity());
+			this.setDeltaMovement(dir);
+
+			this.setNoGravity(!this.hasGravity());
+			// 通知服务端立即向客户端发送速度更新包，防止起步瞬间位置卡顿
+			// this.hasImpulse = true;
+		}else {
+			// 服务端处理追踪
+			if (!this.level().isClientSide) {
+				// 如果有追踪模式，可以在这里实时修正方向
+				// this.handlerHomingMovement();
+			}
+		}
+
+		if (currentLifetime > this.getDelayShootTicks() + 1) {
+			this.xo = this.getX();
+			this.yo = this.getY();
+			this.zo = this.getZ();
+
+			Vec3 delta = this.getDeltaMovement();
+			double nextX = this.getX() + delta.x;
+			double nextY = this.getY() + delta.y;
+			double nextZ = this.getZ() + delta.z;
+			this.setPos(nextX, nextY, nextZ);
+
+			// 摩擦力系数
+			float friction = this.isInWater() ? this.getFrictionWater() : this.getFrictionAir();
+			delta = delta.scale(friction);
+			// 重力
+			delta = delta.subtract(0, this.getGravity(), 0);
+			// 实际应用
+			this.setDeltaMovement(delta);
+		}
+
 		if (!this.level().isClientSide) {
-			this.setTickCount(currentLifetime);
 			if (currentLifetime > this.getMaxAge()) {
 				this.discard();
 			}
+		}else {
+			this.clientPrevRotation.set(this.clientRotation);
+			Vector3f currentDir = new Vector3f(this.getShootDirection());
+			Quaternionf targetQuat = this.calculateRotationFromDirection(currentDir, this.getRoll());
 
-			if (currentLifetime <= this.getDelayShootTicks()) {
-				if (this.getVehicle() == null) {
-					Entity anchor = this.getAnchorEntity();
-					if (anchor != null && !anchor.isRemoved()) {
-						this.startRiding(anchor, true);
-					}
-				}
+			this.clientRotation.set(targetQuat);
 
-				this.setNoGravity(true);
-				this.setDeltaMovement(Vec3.ZERO);
+			if (this.tickCount <= 1) {
+				this.clientPrevRotation.set(this.clientRotation);
 			}
 		}
 	}
 
-	// =========== NBT存储 (已适配 EntityData) ===========
+	private void handlerDelayShootMovementDirection() {
+		AimMode aimMode = this.getAimMode();
+		if (aimMode == AimMode.FIXED) {
+			return;
+		}
+
+		Vec3 targetPos = switch (aimMode) {
+			case OWNER_LOOK -> {
+				Entity owner = this.getOwner();
+				if (owner == null || !owner.isAlive()) yield null;
+
+				Entity crosshairTarget = EntityFindUtils.getNearestAnyEntityToCrosshair(
+						owner, 30.0F, 0.0F, e -> e instanceof LivingEntity
+				);
+
+				if (crosshairTarget != null) {
+					yield crosshairTarget.getBoundingBox().getCenter();
+				}
+				Vec3 lookVec = owner.getLookAngle();
+				yield owner.getEyePosition().add(lookVec.scale(30.0D));
+			}
+			case TARGET_CENTER -> {
+				Entity target = this.getLockedTarget();
+				yield (target != null && target.isAlive()) ? target.getBoundingBox().getCenter() : null;
+			}
+			default -> null;
+		};
+
+		if (targetPos == null) {
+			return;
+		}
+
+		Vec3 dirVec = targetPos.subtract(this.position());
+		Vector3f newDir = new Vector3f((float) dirVec.x, (float) dirVec.y, (float) dirVec.z);
+
+		if (newDir.lengthSquared() > 0.0001F) {
+			this.setShootDirection(newDir.normalize());
+		}
+	}
+
+	public float lastValidYaw = 0.0F;
+	/**
+	 * 根据方向向量与翻滚角生成对应的四元数
+	 */
+	public Quaternionf calculateRotationFromDirection(Vector3f direction, float roll) {
+		float horizontalDistanceSq = direction.x * direction.x + direction.z * direction.z;
+		float horizontalDistance = (float) Math.sqrt(horizontalDistanceSq);
+
+		float yaw;
+
+		// 增加状态阻断：仅在延迟发射阶段（仍挂载/跟随期间）才允许视角跟随
+		boolean isAimingPhase = this.tickCount <= this.getDelayShootTicks();
+
+		if (this.getAimMode() == AimMode.OWNER_LOOK && horizontalDistanceSq < 0.0001F && isAimingPhase) {
+			Entity owner = this.getOwner();
+			if (owner != null) {
+				yaw = (float) Math.toRadians(-owner.getYRot());
+			} else {
+				yaw = this.lastValidYaw;
+			}
+		}
+		// 正常计算（包含 TARGET_CENTER 锁定模式及所有已发射的投射物）
+		else if (horizontalDistanceSq > 0.0001F) {
+			yaw = (float) Math.atan2(direction.x, direction.z);
+			this.lastValidYaw = yaw;
+		}
+		// 绝对极点保护（目标正上/正下，且不在瞄准阶段时锁定为最后的有效 yaw）
+		else {
+			yaw = this.lastValidYaw;
+		}
+
+		float pitch = (float) Math.atan2(direction.y, horizontalDistance);
+		Quaternionf quat = new Quaternionf();
+		quat.rotationY(yaw);
+		quat.rotateX(-pitch);
+
+		if (Math.abs(roll) > 1e-4F) {
+			quat.rotateZ((float) Math.toRadians(roll));
+		}
+
+		return quat;
+	}
+
+	// =========== NBT存储===========
 	@Override
 	public void addAdditionalSaveData(CompoundTag tag) {
 		if (this.ownerUUID != null) {
@@ -350,18 +521,23 @@ public class GenericProjectile extends Entity {
 			tag.putString("AimMode", aimMode.name());
 		}
 
-		Quaternionf quat = this.entityData.get(ROTATION);
-		CompoundTag rotTag = new CompoundTag();
-		rotTag.putFloat("x", quat.x());
-		rotTag.putFloat("y", quat.y());
-		rotTag.putFloat("z", quat.z());
-		rotTag.putFloat("w", quat.w());
-		tag.put("ProjectileRotation", rotTag);
+		Vector3f dir = this.getShootDirection();
+		CompoundTag dirTag = new CompoundTag();
+		dirTag.putFloat("x", dir.x());
+		dirTag.putFloat("y", dir.y());
+		dirTag.putFloat("z", dir.z());
+		tag.put("MovementDirection", dirTag);
+
 		tag.putFloat("Roll", this.entityData.get(ROLL));
 
 		tag.putInt("MaxAge", this.entityData.get(MAX_AGE));
-		tag.putInt("TickCount", this.entityData.get(TICK_COUNT));
+		tag.putInt("TickCount", this.tickCount);
 		tag.putInt("DelayShootTicks", this.entityData.get(DELAY_SHOOT_TICKS));
+		tag.putFloat("Velocity", this.entityData.get(VELOCITY));
+		tag.putBoolean("HasGravity", this.entityData.get(HAS_GRAVITY));
+		tag.putFloat("Gravity", this.entityData.get(GRAVITY));
+		tag.putFloat("frictionAir", this.entityData.get(FRICTION_AIR));
+		tag.putFloat("frictionWater", this.entityData.get(FRICTION_WATER));
 		tag.putString("RenderType", this.entityData.get(RENDER_TYPE));
 	}
 
@@ -395,20 +571,13 @@ public class GenericProjectile extends Entity {
 			}
 		}
 
-		if (tag.contains("ProjectileRotation", Tag.TAG_COMPOUND)) {
-			CompoundTag rotTag = tag.getCompound("ProjectileRotation");
-
-			Quaternionf savedQuat = new Quaternionf(
-					rotTag.getFloat("x"),
-					rotTag.getFloat("y"),
-					rotTag.getFloat("z"),
-					rotTag.getFloat("w")
-			);
-
-			this.entityData.set(ROTATION, savedQuat);
-			if (this.prevRotation != null) {
-				this.prevRotation.set(savedQuat);
-			}
+		if (tag.contains("MovementDirection", Tag.TAG_COMPOUND)) {
+			CompoundTag dirTag = tag.getCompound("MovementDirection");
+			this.setShootDirection(new Vector3f(
+					dirTag.getFloat("x"),
+					dirTag.getFloat("y"),
+					dirTag.getFloat("z")
+			));
 		}
 
 		if (tag.contains("Roll")) {
@@ -419,13 +588,39 @@ public class GenericProjectile extends Entity {
 			this.setMaxAge(tag.getInt("MaxAge"));
 		}
 		if (tag.contains("TickCount")) {
-			this.setTickCount(tag.getInt("TickCount"));
+			this.tickCount = tag.getInt("TickCount");
 		}
 		if (tag.contains("DelayShootTicks")) {
 			this.setDelayShootTicks(tag.getInt("DelayShootTicks"));
 		}
+		if (tag.contains("Velocity")) {
+			this.setVelocity(tag.getFloat("Velocity"));
+		}
+		if (tag.contains("HasGravity")) {
+			this.setHasGravity(tag.getBoolean("HasGravity"));
+		}
+		if (tag.contains("Gravity")) {
+			this.setGravity(tag.getFloat("Gravity"));
+		}
+		if (tag.contains("frictionAir")) {
+			this.setFrictionAir(tag.getFloat("frictionAir"));
+		}
+		if (tag.contains("frictionWater")) {
+			this.setFrictionWater(tag.getFloat("frictionWater"));
+		}
 		if (tag.contains("RenderType")) {
 			this.setRenderType(tag.getString("RenderType"));
 		}
+	}
+
+	@Override
+	public boolean shouldRenderAtSqrDistance(double distance) {
+		double d0 = this.getBoundingBox().getSize();
+		if (Double.isNaN(d0)) {
+			d0 = 1.0F;
+		}
+
+		d0 *= (double)256.0F * Entity.getViewScale();
+		return distance < d0 * d0;
 	}
 }

@@ -1,20 +1,17 @@
 package mod.abbyqaq.abcore.client.renderer.projectile.contect;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.math.Axis;
 import mod.abbyqaq.abcore.annotation.AutoRegisterProjectileRenderer;
 import mod.abbyqaq.abcore.client.renderer.projectile.ProjectileRenderBehavior;
 import mod.abbyqaq.abcore.entity.projectile.GenericProjectile;
 import mod.abbyqaq.abcore.init.ModProjectileRenderTypes;
 import mods.flammpfeil.slashblade.SlashBlade;
-import mods.flammpfeil.slashblade.client.renderer.entity.DriveRenderer;
 import mods.flammpfeil.slashblade.client.renderer.model.BladeModelManager;
 import mods.flammpfeil.slashblade.client.renderer.model.obj.WavefrontObject;
 import mods.flammpfeil.slashblade.client.renderer.util.BladeRenderState;
 import mods.flammpfeil.slashblade.client.renderer.util.MSAutoCloser;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
 import org.joml.Quaternionf;
 
@@ -59,7 +56,7 @@ public class DriveTestRender implements ProjectileRenderBehavior {
 //			poseStack.mulPose(renderRot);
 
 			Quaternionf renderRot = new Quaternionf();
-			entity.prevRotation.slerp(entity.getRotation(), partialTicks, renderRot);
+			entity.clientPrevRotation.slerp(entity.clientRotation, partialTicks, renderRot);
 			poseStack.mulPose(renderRot);
 
 			float scale = 0.015f;

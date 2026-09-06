@@ -24,7 +24,7 @@ public class ModEntities {
 			// 设定基础默认尺寸 (稍后在实体内动态覆盖)
 			.sized(0.25F, 0.25F)
 			// 客户端追踪范围
-			.clientTrackingRange(4)
+			.clientTrackingRange(16)
 			// 网络同步间隔 (10 tick 同步一次，原版投掷物标准)
 			.updateInterval(10)
 			.build("generic_projectile"));
